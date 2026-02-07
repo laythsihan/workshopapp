@@ -1,68 +1,59 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useWorkshopData } from '../hooks/useWorkshopData';
 
-// 1. Correctly capitalized imports
-import Login from "./Login.jsx";
-import Layout from "./Layout.jsx";
-import Dashboard from "./dashboard"; // Pointing to your dashboard file
-import Upload from "./upload";
-import Profile from "./profile";
-import Workshop from "./workshop";
-import Analytics from "./analytics";
+// Components
+import { ProtectedRoute } from '../components/auth/ProtectedRoute';
+import DashboardShell from '../components/layout/DashboardShell';
 
-const PAGES = {
-    dashboard: Dashboard,
-    upload: Upload,
-    profile: Profile,
-    workshop: Workshop,
-    analytics: Analytics,
-};
-
-function _getCurrentPage(url) {
-    let path = url.toLowerCase();
-    if (path.endsWith('/')) path = path.slice(0, -1);
-    const parts = path.split('/');
-    const lastPart = parts[parts.length - 1];
-    
-    const pageName = Object.keys(PAGES).find(page => page.toLowerCase() === lastPart);
-    return pageName || 'dashboard';
-}
-
-function PagesContent() {
-    const location = useLocation();
-    const currentPage = _getCurrentPage(location.pathname);
-    
-    // 2. Logic to hide the Sidebar/Layout on the Login page
-    const isLoginPage = location.pathname === "/login";
-
-    if (isLoginPage) {
-        return (
-            <Routes>
-                <Route path="/login" element={<Login />} />
-            </Routes>
-        );
-    }
-
-    return (
-        <Layout currentPageName={currentPage}>
-            <Routes>            
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/upload" element={<Upload />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/workshop" element={<Workshop />} />
-                <Route path="/analytics" element={<Analytics />} />
-                {/* Fallback for authenticated routes */}
-                <Route path="*" element={<Dashboard />} />
-            </Routes>
-        </Layout>
-    );
-}
+// Pages
+import Login from './login';
+import Dashboard from './dashboard';
+import Workshop from './workshop';
+import Upload from './upload';
 
 export default function Pages() {
-    return (
-        <Router>
-            <PagesContent />
-        </Router>
-    );
+  const { user } = useAuth();
+  // Fetch data once at the top level
+  const { pieces, activity, isLoading } = useWorkshopData(user);
+
+  return (
+    <Routes>
+      {/* Public Route */}
+      <Route path="/login" element={<Login />} />
+
+      {/* Protected Routes Wrapped in Shell */}
+      <Route element={<ProtectedRoute />}>
+        <Route 
+          path="/dashboard" 
+          element={
+            <DashboardShell pieces={pieces} activity={activity} isLoading={isLoading}>
+              <Dashboard pieces={pieces} isLoading={isLoading} />
+            </DashboardShell>
+          } 
+        />
+        
+        <Route 
+          path="/upload" 
+          element={
+            <DashboardShell pieces={pieces} activity={activity} isLoading={isLoading}>
+              <Upload />
+            </DashboardShell>
+          } 
+        />
+
+        {/* Workshop usually gets its own distraction-free layout, 
+            but we still pass the pieces for navigation if needed */}
+        <Route 
+          path="/workshop" 
+          element={<Workshop allPieces={pieces} />} 
+        />
+      </Route>
+
+      {/* Redirects */}
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  );
 }
