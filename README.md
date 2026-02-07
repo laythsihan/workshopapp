@@ -1,20 +1,25 @@
-# Base44 App
+# Workshop App
 
+A professional writing environment designed for authors to upload manuscripts, manage versions, and conduct line-by-line workshops.
 
-This app was created automatically by Base44.
-It's a Vite+React app that communicates with the Base44 API.
+## 🚀 Features
 
-## Running the app
+- **Multi-Format Uploads**: Support for `.txt`, `.md`, `.docx`, and `.pdf` files.
+- **Traditional File Handling**: Processes document text at submission time for a snappy UI experience.
+- **Version Control**: Built-in logic to track "Original Drafts" and subsequent iterations.
+- **Secure Backend**: Powered by Supabase with Row Level Security (RLS) to protect author privacy.
+- **Literary UI**: A clean, serif-driven design optimized for long-form reading and editing.
 
-```bash
-npm install
-npm run dev
-```
+## 🛠️ Tech Stack
 
-## Building the app
+- **Frontend**: React, Vite, Tailwind CSS, Radix UI
+- **Database/Auth**: [Supabase](https://supabase.com)
+- **Document Parsing**: Mammoth.js (DOCX), PDF.js (PDF)
+- **Icons**: Lucide React
 
-```bash
-npm run build
-```
+## 📦 Getting Started
 
-For more information and support, please contact Base44 support at app@base44.com.
+1. **Clone the repository**:
+   ```bash
+   git clone [https://github.com/laythsihan/workshopapp.git](https://github.com/laythsihan/workshopapp.git)
+   cd workshopapp
