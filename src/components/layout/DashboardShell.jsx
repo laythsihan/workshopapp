@@ -84,17 +84,19 @@ export default function DashboardShell({ children, pieces = [], activity = [], i
 
         {/* User Account & Logout Section */}
         <div className="p-4 mt-auto border-t border-stone-100 bg-stone-50/50">
-          <div className="flex items-center gap-3 px-3 py-3 mb-2">
-            <div className="w-8 h-8 rounded-full bg-stone-200 flex items-center justify-center text-stone-500">
-              <User className="w-4 h-4" />
+          <Link to="/profile">
+            <div className="flex items-center gap-3 px-3 py-3 mb-2 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer">
+              <div className="w-8 h-8 rounded-full bg-stone-200 flex items-center justify-center text-stone-500">
+                <User className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-medium text-stone-900 truncate">
+                  {user?.email?.split('@')[0]}
+                </span>
+                <span className="text-[10px] text-stone-400 truncate tracking-tight">View Profile</span>
+              </div>
             </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-medium text-stone-900 truncate">
-                {user?.email?.split('@')[0]}
-              </span>
-              <span className="text-[10px] text-stone-400 truncate tracking-tight">Author Account</span>
-            </div>
-          </div>
+          </Link>
           
           <Button 
             variant="ghost" 

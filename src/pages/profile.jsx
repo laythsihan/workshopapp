@@ -18,14 +18,22 @@ import {
   Calendar,
   Mail,
   Camera,
-  Upload
+  Trash2,
+  ExternalLink
 } from "lucide-react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
+import DeletePieceDialog from "@/components/workshop/DeletePieceDialog";
 
-export default function ProfilePage() {
-  const [user, setUser] = useState(null);
+/**
+ * Profile Page
+ * @param {Object} user - User data from useWorkshopData
+ * @param {Array} pieces - Pieces from useWorkshopData  
+ * @param {Function} onRefresh - Refresh function to reload data
+ */
+export default function ProfilePage({ user: propUser, pieces = [], onRefresh }) {
+  const [user, setUser] = useState(propUser);
   const [formData, setFormData] = useState({
     full_name: "",
     bio: "",
@@ -35,16 +43,7 @@ export default function ProfilePage() {
     website: "",
     avatar_url: ""
   });
-  const [originalFormData, setOriginalFormData] = useState({
-    full_name: "",
-    bio: "",
-    writing_interests: "",
-    preferred_genres: "",
-    location: "",
-    website: "",
-    avatar_url: ""
-  });
-  const [isLoading, setIsLoading] = useState(true);
+  const [originalFormData, setOriginalFormData] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -54,31 +53,23 @@ export default function ProfilePage() {
   // Check if there are any changes
   const hasChanges = JSON.stringify(formData) !== JSON.stringify(originalFormData);
 
+  // Initialize form data when user prop changes
   useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
-    try {
-      const userData = await User.me();
-      setUser(userData);
+    if (propUser) {
       const profileData = {
-        full_name: userData.full_name || "",
-        bio: userData.bio || "",
-        writing_interests: userData.writing_interests || "",
-        preferred_genres: userData.preferred_genres || "",
-        location: userData.location || "",
-        website: userData.website || "",
-        avatar_url: userData.avatar_url || ""
+        full_name: propUser.full_name || "",
+        bio: propUser.bio || "",
+        writing_interests: propUser.writing_interests || "",
+        preferred_genres: propUser.preferred_genres || "",
+        location: propUser.location || "",
+        website: propUser.website || "",
+        avatar_url: propUser.avatar_url || ""
       };
       setFormData(profileData);
       setOriginalFormData(profileData);
-    } catch (error) {
-      console.error("Error loading user data:", error);
-      setMessage({ type: "error", content: "Failed to load profile data" });
+      setUser(propUser);
     }
-    setIsLoading(false);
-  };
+  }, [propUser]);
 
   const handleAvatarUpload = async (event) => {
     const file = event.target.files[0];
@@ -113,10 +104,12 @@ export default function ProfilePage() {
     e.preventDefault();
     setIsSaving(true);
     try {
-      await User.updateMyUserData(formData);
+      await User.updateProfile(formData);
       setUser(prev => ({ ...prev, ...formData }));
-      setOriginalFormData(formData); // Update original data after successful save
+      setOriginalFormData(formData);
       setMessage({ type: "success", content: "Profile updated successfully!" });
+      // Refresh app data to sync
+      if (onRefresh) onRefresh();
     } catch (error) {
       console.error("Error updating profile:", error);
       setMessage({ type: "error", content: "Failed to update profile" });
@@ -127,10 +120,7 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      await User.logout();
-      // Force a full page reload. This is the most reliable way to ensure
-      // the entire application re-initializes and the Layout component's
-      // authentication check runs from a clean state.
+      await User.signOut();
       window.location.reload();
     } catch (error) {
       console.error("Error logging out:", error);
@@ -139,7 +129,7 @@ export default function ProfilePage() {
     }
   };
 
-  if (isLoading) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-transparent p-6">
         <div className="max-w-4xl mx-auto">
@@ -391,6 +381,73 @@ export default function ProfilePage() {
                   <LogOut className="w-4 h-4 mr-2" />
                   {isLoggingOut ? "Logging out..." : "Log Out"}
                 </Button>
+              </CardContent>
+            </Card>
+
+            {/* My Manuscripts */}
+            <Card className="bg-white/80 backdrop-blur-sm border-stone-200/50">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between text-lg text-stone-800">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-5 h-5 text-stone-600" />
+                    My Manuscripts
+                  </div>
+                  <Badge variant="outline">{pieces.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {pieces.length === 0 ? (
+                  <p className="text-sm text-stone-500 text-center py-4">
+                    No manuscripts yet
+                  </p>
+                ) : (
+                  pieces.map((piece) => (
+                    <div 
+                      key={piece.id}
+                      className="flex items-center justify-between p-3 bg-stone-50 rounded-lg hover:bg-stone-100 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0 mr-2">
+                        <p className="text-sm font-medium text-stone-800 truncate">
+                          {piece.title}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge 
+                            variant="outline" 
+                            className="text-xs capitalize"
+                          >
+                            {piece.status?.replace(/_/g, ' ') || 'draft'}
+                          </Badge>
+                          <span className="text-xs text-stone-500">
+                            {piece.word_count || 0} words
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-stone-400 hover:text-stone-600"
+                          onClick={() => navigate(`/workshop?piece=${piece.id}`)}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                        <DeletePieceDialog
+                          piece={piece}
+                          onSuccess={onRefresh}
+                          trigger={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-stone-400 hover:text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          }
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { supabase } from "../../lib/supabase"; // Fixed Path
+import { supabase } from "../../lib/supabase";
+import { Comment } from "../../api/entities";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -33,7 +34,7 @@ export default function CommentCard({
   const [replyText, setReplyText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editedText, setEditedText] = useState(comment.comment_text || "");
+  const [editedText, setEditedText] = useState(comment.content || "");
   const { toast } = useToast();
 
   const canEditOrDelete = !isCompleted && currentUser?.id === comment.author_id;
@@ -42,21 +43,17 @@ export default function CommentCard({
     if (!replyText.trim() || !currentUser) return;
     setIsProcessing(true);
     try {
-      const { error } = await supabase
-        .from('comments')
-        .insert([{
-          piece_id: piece.id,
-          author_id: currentUser.id,
-          parent_comment_id: comment.id,
-          comment_text: replyText.trim(),
-          content: replyText.trim(),
-        }]);
+      await Comment.create({
+        piece_id: piece.id,
+        parent_comment_id: comment.id,
+        content: replyText.trim()
+      });
 
-      if (error) throw error;
       setReplyText("");
       onCommentUpdate?.();
       toast({ title: "Reply posted" });
     } catch (error) {
+      console.error("Reply error:", error);
       toast({ title: "Error", description: "Failed to post reply", variant: "destructive" });
     } finally {
       setIsProcessing(false);
@@ -65,10 +62,11 @@ export default function CommentCard({
 
   const handleDelete = async () => {
     try {
-      const { error } = await supabase.from('comments').delete().eq('id', comment.id);
-      if (error) throw error;
+      await Comment.delete(comment.id);
       onCommentUpdate?.();
+      toast({ title: "Comment deleted" });
     } catch (error) {
+      console.error("Delete error:", error);
       toast({ title: "Error", description: "Delete failed", variant: "destructive" });
     }
   };
@@ -116,7 +114,7 @@ export default function CommentCard({
             )}
           </div>
 
-          <p className="text-sm text-stone-700 whitespace-pre-wrap">{comment.comment_text}</p>
+          <p className="text-sm text-stone-700 whitespace-pre-wrap">{comment.content}</p>
 
           {/* Render Threaded Replies */}
           {replies.length > 0 && (
@@ -124,7 +122,7 @@ export default function CommentCard({
               {replies.map(reply => (
                 <div key={reply.id} className="text-xs text-stone-600 bg-stone-50 p-2 rounded">
                   <span className="font-bold mr-2">{reply.author_id?.substring(0, 4)}:</span>
-                  {reply.comment_text}
+                  {reply.content}
                 </div>
               ))}
             </div>

@@ -1,8 +1,6 @@
-
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, File, Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
 
 export default function FileUploadDropzone({ onFileUpload, isProcessing }) {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -50,7 +48,7 @@ export default function FileUploadDropzone({ onFileUpload, isProcessing }) {
   };
 
   return (
-    <motion.div
+    <div
       className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 ${
         isDragOver 
           ? 'border-amber-400 bg-amber-50' 
@@ -59,8 +57,6 @@ export default function FileUploadDropzone({ onFileUpload, isProcessing }) {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
     >
       <input
         ref={fileInputRef}
@@ -74,7 +70,7 @@ export default function FileUploadDropzone({ onFileUpload, isProcessing }) {
         <div className="space-y-4">
           <Loader2 className="w-12 h-12 text-amber-600 mx-auto animate-spin" />
           <div>
-            <h3 className="literary-heading text-lg font-semibold text-gray-700">Processing File</h3>
+            <h3 className="text-lg font-semibold text-gray-700">Processing File</h3>
             <p className="text-sm text-gray-500 mt-1">Extracting text content...</p>
           </div>
         </div>
@@ -84,7 +80,7 @@ export default function FileUploadDropzone({ onFileUpload, isProcessing }) {
             <Upload className="w-8 h-8 text-amber-600" />
           </div>
           <div>
-            <h3 className="literary-heading text-lg font-semibold text-gray-700 mb-2">
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">
               Upload Your Writing
             </h3>
             <p className="text-sm text-gray-500 mb-4">
@@ -105,6 +101,6 @@ export default function FileUploadDropzone({ onFileUpload, isProcessing }) {
           </div>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }

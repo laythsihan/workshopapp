@@ -1,74 +1,58 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { User, Piece, Comment } from '../api/entities';
 
-export function useWorkshopData(user) {
+/**
+ * Centralized data hook for the entire app
+ * Loads user, pieces, and activity once at the router level
+ * Returns refresh function for pages to trigger reload
+ */
+export function useWorkshopData() {
+  const [user, setUser] = useState(null);
   const [pieces, setPieces] = useState([]);
   const [activity, setActivity] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
-    if (!user) return;
     setIsLoading(true);
 
     try {
-      // 1. Fetch pieces you OWN
-      const { data: ownedPieces } = await supabase
-        .from('pieces')
-        .select('*')
-        .eq('owner_id', user.id);
+      // 1. Get current user
+      const userData = await User.me();
+      setUser(userData);
 
-      // 2. Fetch pieces you are INVITED TO
-      const { data: collaborators } = await supabase
-        .from('collaborators')
-        .select('piece_id')
-        .eq('invitee_email', user.email);
-
-      const invitedIds = collaborators?.map(c => c.piece_id) || [];
-      
-      let allPieces = [...(ownedPieces || [])];
-      
-      if (invitedIds.length > 0) {
-        const { data: invitedPieces } = await supabase
-          .from('pieces')
-          .select('*')
-          .in('id', invitedIds);
-        
-        if (invitedPieces) {
-          // Mark invited pieces so we can show a badge later
-          const markedInvited = invitedPieces.map(p => ({ ...p, isInvited: true }));
-          allPieces = [...allPieces, ...markedInvited];
-        }
+      if (!userData) {
+        setIsLoading(false);
+        return;
       }
 
-      // 3. Fetch Recent Activity (Fixes the 400 Error with explicit join)
-      const { data: activityData } = await supabase
-        .from('comments')
-        .select(`
-          id,
-          piece_id,
-          author_id,
-          comment_text,
-          created_at,
-          pieces:piece_id(title, owner_id),
-          profiles:author_id(full_name)
-        `)
-        .eq('pieces.owner_id', user.id)
-        .neq('author_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      setPieces(allPieces);
-      setActivity(activityData || []);
+      // 2. Get all pieces (owned + invited)
+      const allPieces = await Piece.list();
+      
+      // 3. Get recent comments for activity feed
+      const recentComments = await Comment.listRecent(10);
+      
+      setPieces(allPieces || []);
+      setActivity(recentComments || []);
     } catch (error) {
       console.error("Workshop Data Error:", error);
+      // Don't throw - let the app continue with empty data
+      setUser(null);
+      setPieces([]);
+      setActivity([]);
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  return { pieces, activity, isLoading, refresh: fetchData };
+  return { 
+    user,
+    pieces, 
+    activity, 
+    isLoading, 
+    refresh: fetchData 
+  };
 }

@@ -48,7 +48,7 @@ export default function CommentSidebar({
         // Filter by Search Query
         if (searchQuery.trim()) {
           const query = searchQuery.toLowerCase();
-          const contentMatch = (comment.comment_text || comment.content || "").toLowerCase().includes(query);
+          const contentMatch = (comment.content || "").toLowerCase().includes(query);
           const textMatch = (comment.selection_json?.text || "").toLowerCase().includes(query);
           if (!contentMatch && !textMatch) return false;
         }

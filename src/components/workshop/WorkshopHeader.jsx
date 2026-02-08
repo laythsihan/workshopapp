@@ -36,7 +36,7 @@ export default function WorkshopHeader({ piece, user, isEditing, onToggleEdit, c
   const [hasChildVersion, setHasChildVersion] = useState(false); // New state to track if a new version has been created
   const { toast } = useToast();
 
-  const isAuthor = !isMock && user?.email === piece.created_by;
+  const isAuthor = !isMock && user?.id === piece.owner_id;
   const canInvite = !isMock && isAuthor && (piece.status === 'draft' || piece.status === 'ready_for_feedback');
   const isCompleted = piece.status === 'completed';
   const isReviewer = !isAuthor && piece.collaborators?.includes(user?.email); // Changed: Removed '!isMock' to allow reviewers for mock pieces
@@ -106,7 +106,7 @@ export default function WorkshopHeader({ piece, user, isEditing, onToggleEdit, c
 
     // Format the content as Markdown
     let fileContent = `# ${piece.title}\n\n`;
-    fileContent += `_By: ${piece.created_by}_\n\n`;
+    fileContent += `_By: ${user?.email || 'Author'}_\n\n`;
     fileContent += `**Version:** ${piece.version_number || '1.0'}\n`;
     fileContent += `**Status:** ${piece.status.replace(/_/g, ' ')}\n`;
     fileContent += `**Word Count:** ${piece.word_count}\n`;
@@ -208,7 +208,7 @@ export default function WorkshopHeader({ piece, user, isEditing, onToggleEdit, c
               )}
             </div>
             <div className="flex items-center gap-2 text-sm text-stone-500">
-              <span className="shrink-0">by {piece.created_by?.split('@')[0]}</span>
+              <span className="shrink-0">by {user?.email?.split('@')[0] || 'you'}</span>
               {piece.version_notes && (
                 <>
                   <span className="hidden sm:inline">•</span>
@@ -220,7 +220,7 @@ export default function WorkshopHeader({ piece, user, isEditing, onToggleEdit, c
         </div>
         <div className="flex items-center gap-2 md:gap-3 flex-wrap justify-start sm:justify-end w-full sm:w-auto">
           <div className="hidden sm:flex -space-x-2">
-            {[piece.created_by, ...(piece.collaborators || [])].slice(0, 4).map((email, i) => (
+            {[user?.email, ...(piece.collaborators || [])].filter(Boolean).slice(0, 4).map((email, i) => (
               <Popover key={i}>
                 <PopoverTrigger asChild>
                   <div 

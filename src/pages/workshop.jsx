@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase.js";
+import { Comment, Version } from "../api/entities";
 import { useToast } from "@/components/ui/use-toast";
 
 import TextRenderer from "../components/workshop/TextRenderer";
@@ -39,7 +40,7 @@ export default function WorkshopPage() {
    */
   const formatComment = useCallback((c) => ({
     ...c,
-    comment_text: c.comment_text || c.content || "",
+    content: c.content || "",
     selected_text: c.selection_json?.text || "",
     position_start: c.selection_json?.start || 0,
     position_end: c.selection_json?.end || 0,
@@ -161,35 +162,27 @@ export default function WorkshopPage() {
       // 1. Ensure we have a version record to link to (creates one if missing)
       let vId = currentVersion?.id;
       if (!vId) {
-        const { data: newV, error: vErr } = await supabase
-          .from('versions')
-          .insert([{ piece_id: piece.id, content: piece.content, author_id: user.id }])
-          .select().single();
-        if (vErr) throw vErr;
+        const newV = await Version.create({
+          piece_id: piece.id,
+          content: piece.content,
+          author_id: user.id
+        });
         vId = newV.id;
         setCurrentVersion(newV);
       }
 
-      // 2. Insert the Comment (Fills both column types for schema bridging)
-      const { data: newComment, error } = await supabase
-        .from('comments')
-        .insert([{
-          piece_id: piece.id,
-          author_id: user.id,
-          comment_text: commentText, 
-          content: commentText,      
-          version_id: vId,
-          selection_json: {
-            text: tempAnnotation.selected_text,
-            start: tempAnnotation.position_start,
-            end: tempAnnotation.position_end,
-            type: tempAnnotation.comment_type
-          }
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
+      // 2. Insert the Comment using new API
+      const newComment = await Comment.create({
+        piece_id: piece.id,
+        version_id: vId,
+        content: commentText,
+        selection_json: {
+          text: tempAnnotation.selected_text,
+          start: tempAnnotation.position_start,
+          end: tempAnnotation.position_end,
+          type: tempAnnotation.comment_type
+        }
+      });
 
       // Local State Update
       setComments(prev => [...prev, formatComment(newComment)]);
@@ -231,9 +224,13 @@ export default function WorkshopPage() {
     <div className="min-h-screen bg-stone-50/50 flex flex-col lg:flex-row overflow-hidden">
       <div className="flex-1 flex flex-col min-w-0 relative">
         <WorkshopHeader 
-          piece={piece} 
+          piece={piece}
+          user={user}
           isEditing={isEditing} 
-          onToggleEdit={() => setIsEditing(!isEditing)} 
+          onToggleEdit={() => setIsEditing(!isEditing)}
+          onPieceUpdate={loadData}
+          comments={comments}
+          onSubmitReview={loadData}
         />
         
         <main className="flex-1 overflow-y-auto p-4 md:p-12">

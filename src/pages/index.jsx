@@ -1,6 +1,5 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { useWorkshopData } from '../hooks/useWorkshopData';
 
 // Components
@@ -12,24 +11,38 @@ import Login from './login';
 import Dashboard from './dashboard';
 import Workshop from './workshop';
 import Upload from './upload';
+import Profile from './profile';
 
+/**
+ * Main router component
+ * Loads all shared data once via useWorkshopData
+ * Passes data down to all pages via props
+ */
 export default function Pages() {
-  const { user } = useAuth();
-  // Fetch data once at the top level
-  const { pieces, activity, isLoading } = useWorkshopData(user);
+  // Load ALL shared data once at the top level
+  const { user, pieces, activity, isLoading, refresh } = useWorkshopData();
 
   return (
     <Routes>
       {/* Public Route */}
       <Route path="/login" element={<Login />} />
 
-      {/* Protected Routes Wrapped in Shell */}
+      {/* Protected Routes Wrapped in DashboardShell */}
       <Route element={<ProtectedRoute />}>
         <Route 
           path="/dashboard" 
           element={
-            <DashboardShell pieces={pieces} activity={activity} isLoading={isLoading}>
-              <Dashboard pieces={pieces} isLoading={isLoading} />
+            <DashboardShell 
+              user={user}
+              pieces={pieces} 
+              activity={activity} 
+              isLoading={isLoading}
+            >
+              <Dashboard 
+                pieces={pieces} 
+                isLoading={isLoading} 
+                onRefresh={refresh}
+              />
             </DashboardShell>
           } 
         />
@@ -37,14 +50,36 @@ export default function Pages() {
         <Route 
           path="/upload" 
           element={
-            <DashboardShell pieces={pieces} activity={activity} isLoading={isLoading}>
-              <Upload />
+            <DashboardShell 
+              user={user}
+              pieces={pieces} 
+              activity={activity} 
+              isLoading={isLoading}
+            >
+              <Upload onRefresh={refresh} />
             </DashboardShell>
           } 
         />
 
-        {/* Workshop usually gets its own distraction-free layout, 
-            but we still pass the pieces for navigation if needed */}
+        <Route 
+          path="/profile" 
+          element={
+            <DashboardShell 
+              user={user}
+              pieces={pieces} 
+              activity={activity} 
+              isLoading={isLoading}
+            >
+              <Profile 
+                user={user}
+                pieces={pieces}
+                onRefresh={refresh}
+              />
+            </DashboardShell>
+          } 
+        />
+
+        {/* Workshop has its own distraction-free layout */}
         <Route 
           path="/workshop" 
           element={<Workshop allPieces={pieces} />} 

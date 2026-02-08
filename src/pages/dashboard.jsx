@@ -1,17 +1,27 @@
-import React, { useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Book, Clock, Users } from "lucide-react";
+import { Plus, Book, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import InviteCollaboratorsDialog from "@/components/workshop/InviteCollaboratorsDialog";
+import DeletePieceDialog from "@/components/workshop/DeletePieceDialog";
 
-export default function Dashboard({ pieces = [], isLoading, onUpdate }) {
+/**
+ * Dashboard - displays user's pieces
+ * @param {Array} pieces - Pieces from useWorkshopData
+ * @param {boolean} isLoading - Loading state from useWorkshopData
+ * @param {Function} onRefresh - Refresh function to reload data after changes
+ */
+export default function Dashboard({ pieces = [], isLoading = false, onRefresh }) {
   const navigate = useNavigate();
-  const [selectedPiece, setSelectedPiece] = useState(null);
 
   if (isLoading) {
-    return <div className="flex justify-center py-20">Loading your library...</div>;
+    return (
+      <div className="flex justify-center py-20">
+        <div className="text-stone-500">Loading your library...</div>
+      </div>
+    );
   }
 
   return (
@@ -39,7 +49,7 @@ export default function Dashboard({ pieces = [], isLoading, onUpdate }) {
               <CardContent className="p-6">
                 <div className="flex justify-between items-start mb-4">
                   <Badge variant={piece.isInvited ? "secondary" : "outline"} className="capitalize">
-                    {piece.isInvited ? "Reviewing" : piece.status.replace(/_/g, ' ')}
+                    {piece.isInvited ? "Reviewing" : piece.status?.replace(/_/g, ' ') || 'draft'}
                   </Badge>
                   <span className="text-[10px] text-stone-400 font-mono">
                     {new Date(piece.created_at).toLocaleDateString()}
@@ -48,7 +58,7 @@ export default function Dashboard({ pieces = [], isLoading, onUpdate }) {
                 
                 <h3 className="text-xl font-serif font-bold mb-2 line-clamp-1">{piece.title}</h3>
                 
-                <div className="flex items-center gap-4 mt-6">
+                <div className="flex items-center gap-2 mt-6">
                   <Button 
                     variant="outline" 
                     className="flex-1 border-stone-200"
@@ -58,15 +68,31 @@ export default function Dashboard({ pieces = [], isLoading, onUpdate }) {
                   </Button>
                   
                   {!piece.isInvited && (
-                    <InviteCollaboratorsDialog 
-                      piece={piece} 
-                      onUpdate={onUpdate}
-                      trigger={
-                        <Button variant="ghost" size="icon" className="text-stone-400 hover:text-black">
-                          <Users className="w-4 h-4" />
-                        </Button>
-                      }
-                    />
+                    <>
+                      <InviteCollaboratorsDialog 
+                        piece={piece} 
+                        onUpdate={onRefresh}
+                        trigger={
+                          <Button variant="ghost" size="icon" className="text-stone-400 hover:text-black">
+                            <Users className="w-4 h-4" />
+                          </Button>
+                        }
+                      />
+                      
+                      <DeletePieceDialog
+                        piece={piece}
+                        onSuccess={onRefresh}
+                        trigger={
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="text-stone-400 hover:text-red-600"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        }
+                      />
+                    </>
                   )}
                 </div>
               </CardContent>
