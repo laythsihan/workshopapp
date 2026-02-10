@@ -11,7 +11,17 @@ alter table public.comments
   add column if not exists comment_text text;
 
 alter table public.comments
-  add column if not exists status text not null default 'draft';
+  add column if not exists status text;
+
+update public.comments
+set status = 'draft'
+where status is null or status not in ('draft', 'submitted');
+
+alter table public.comments
+  alter column status set default 'draft';
+
+alter table public.comments
+  alter column status set not null;
 
 do $$
 begin
@@ -23,9 +33,13 @@ begin
   ) then
     alter table public.comments
       add constraint comments_status_check
-      check (status in ('draft', 'submitted'));
+      check (status in ('draft', 'submitted'))
+      not valid;
   end if;
 end $$;
+
+alter table public.comments
+  validate constraint comments_status_check;
 
 update public.comments
 set comment_text = coalesce(comment_text, content)
@@ -58,6 +72,22 @@ create trigger comments_sync_content_fields_trg
 before insert or update on public.comments
 for each row
 execute function public.sync_comment_content_fields();
+
+-- Remove duplicate invites before adding a uniqueness index.
+with ranked_collaborators as (
+  select
+    ctid,
+    row_number() over (
+      partition by piece_id, lower(invitee_email)
+      order by created_at asc nulls last, ctid
+    ) as rn
+  from public.collaborators
+  where invitee_email is not null
+)
+delete from public.collaborators c
+using ranked_collaborators r
+where c.ctid = r.ctid
+  and r.rn > 1;
 
 create unique index if not exists collaborators_piece_email_uq
   on public.collaborators (piece_id, lower(invitee_email));
@@ -166,8 +196,17 @@ alter table public.pieces enable row level security;
 alter table public.versions enable row level security;
 alter table public.comments enable row level security;
 alter table public.collaborators enable row level security;
-alter table public.version_chains enable row level security;
-alter table public.projects enable row level security;
+
+do $$
+begin
+  if to_regclass('public.version_chains') is not null then
+    execute 'alter table public.version_chains enable row level security';
+  end if;
+
+  if to_regclass('public.projects') is not null then
+    execute 'alter table public.projects enable row level security';
+  end if;
+end $$;
 
 -- -----------------------------------------------------------------------------
 -- 5) Policies: profiles
@@ -360,55 +399,78 @@ using (
 );
 
 -- -----------------------------------------------------------------------------
--- 10) Policies: version_chains + projects
+-- 10) Policies: version_chains + projects (optional tables)
 -- -----------------------------------------------------------------------------
 
-create policy version_chains_select_owner_email
-on public.version_chains
-for select
-to authenticated
-using (lower(coalesce(author_email, '')) = public.current_user_email());
+do $$
+begin
+  if to_regclass('public.version_chains') is not null then
+    execute $sql$
+      create policy version_chains_select_owner_email
+      on public.version_chains
+      for select
+      to authenticated
+      using (lower(coalesce(author_email, '')) = public.current_user_email())
+    $sql$;
 
-create policy version_chains_insert_owner_email
-on public.version_chains
-for insert
-to authenticated
-with check (lower(coalesce(author_email, '')) = public.current_user_email());
+    execute $sql$
+      create policy version_chains_insert_owner_email
+      on public.version_chains
+      for insert
+      to authenticated
+      with check (lower(coalesce(author_email, '')) = public.current_user_email())
+    $sql$;
 
-create policy version_chains_update_owner_email
-on public.version_chains
-for update
-to authenticated
-using (lower(coalesce(author_email, '')) = public.current_user_email())
-with check (lower(coalesce(author_email, '')) = public.current_user_email());
+    execute $sql$
+      create policy version_chains_update_owner_email
+      on public.version_chains
+      for update
+      to authenticated
+      using (lower(coalesce(author_email, '')) = public.current_user_email())
+      with check (lower(coalesce(author_email, '')) = public.current_user_email())
+    $sql$;
 
-create policy version_chains_delete_owner_email
-on public.version_chains
-for delete
-to authenticated
-using (lower(coalesce(author_email, '')) = public.current_user_email());
+    execute $sql$
+      create policy version_chains_delete_owner_email
+      on public.version_chains
+      for delete
+      to authenticated
+      using (lower(coalesce(author_email, '')) = public.current_user_email())
+    $sql$;
+  end if;
 
-create policy projects_select_owner
-on public.projects
-for select
-to authenticated
-using (user_id = auth.uid());
+  if to_regclass('public.projects') is not null then
+    execute $sql$
+      create policy projects_select_owner
+      on public.projects
+      for select
+      to authenticated
+      using (user_id = auth.uid())
+    $sql$;
 
-create policy projects_insert_owner
-on public.projects
-for insert
-to authenticated
-with check (user_id = auth.uid());
+    execute $sql$
+      create policy projects_insert_owner
+      on public.projects
+      for insert
+      to authenticated
+      with check (user_id = auth.uid())
+    $sql$;
 
-create policy projects_update_owner
-on public.projects
-for update
-to authenticated
-using (user_id = auth.uid())
-with check (user_id = auth.uid());
+    execute $sql$
+      create policy projects_update_owner
+      on public.projects
+      for update
+      to authenticated
+      using (user_id = auth.uid())
+      with check (user_id = auth.uid())
+    $sql$;
 
-create policy projects_delete_owner
-on public.projects
-for delete
-to authenticated
-using (user_id = auth.uid());
+    execute $sql$
+      create policy projects_delete_owner
+      on public.projects
+      for delete
+      to authenticated
+      using (user_id = auth.uid())
+    $sql$;
+  end if;
+end $$;
