@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("login page renders core auth UI", async ({ page }) => {
   await page.goto("/login");
 
-  await expect(page.getByRole("heading", { name: /workshop/i })).toBeVisible();
+  await expect(page.getByText(/workshop login|join workshop/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /sign in|create account/i })).toBeVisible();
 });
 
