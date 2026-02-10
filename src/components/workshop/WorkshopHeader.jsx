@@ -74,21 +74,23 @@ export default function WorkshopHeader({ piece, user, isEditing, onToggleEdit, c
 
   // Get user's DRAFT comments for review submission count
   const userDraftComments = useMemo(() => {
+    const currentUserId = user?.id;
+
     // For mock pieces, we need to count all comments since they don't have status field
     if (isMock) {
       return comments?.filter(comment => 
-        comment.commenter_email === user?.email &&
+        comment.author_id === currentUserId &&
         comment.piece_id === piece.id
       ) || [];
     }
     
     // For real pieces, filter by draft status
     return comments?.filter(comment => 
-      comment.commenter_email === user?.email &&
+      comment.author_id === currentUserId &&
       comment.piece_id === piece.id &&
-      comment.status === 'draft'
+      (comment.status ? comment.status === 'draft' : true)
     ) || [];
-  }, [comments, user?.email, piece.id, isMock]);
+  }, [comments, user?.id, piece.id, isMock]);
 
   const handleDownload = async () => {
     let allPieceComments = [];
@@ -97,12 +99,18 @@ export default function WorkshopHeader({ piece, user, isEditing, onToggleEdit, c
       // For mock pieces, use the comments from props to ensure what you see is what you get.
       allPieceComments = comments.filter(c => c.piece_id === piece.id);
     } else {
-      // For real pieces, fetch only submitted comments to provide the author with the final version.
-      allPieceComments = await Comment.filter({ piece_id: piece.id, status: 'submitted' }, "created_date");
+      allPieceComments = await Comment.filter({ piece_id: piece.id }, "created_at");
     }
 
-    const overallFeedbackComments = allPieceComments.filter(c => c.selected_text === "Overall Feedback");
-    const inlineComments = allPieceComments.filter(c => c.selected_text !== "Overall Feedback");
+    const extractSelectedText = (comment) => comment.selection_json?.text || comment.selected_text || "";
+    const extractCommentText = (comment) => comment.content || comment.comment_text || "";
+    const getCommentAuthor = (comment) =>
+      comment.profiles?.full_name ||
+      comment.author_id?.slice(0, 8) ||
+      "Reviewer";
+
+    const overallFeedbackComments = allPieceComments.filter(c => extractSelectedText(c) === "Overall Feedback");
+    const inlineComments = allPieceComments.filter(c => extractSelectedText(c) !== "Overall Feedback");
 
     // Format the content as Markdown
     let fileContent = `# ${piece.title}\n\n`;
@@ -119,18 +127,18 @@ export default function WorkshopHeader({ piece, user, isEditing, onToggleEdit, c
     if (overallFeedbackComments.length > 0) {
       fileContent += '\n\n---\n\n## Review Summaries\n\n';
       overallFeedbackComments.forEach(comment => {
-        fileContent += `### Summary from ${comment.commenter_email}:\n`;
+        fileContent += `### Summary from ${getCommentAuthor(comment)}:\n`;
         // Ensure multi-line notes are formatted correctly as a blockquote
-        fileContent += `> ${comment.comment_text.replace(/\n/g, '\n> ')}\n\n`;
+        fileContent += `> ${extractCommentText(comment).replace(/\n/g, '\n> ')}\n\n`;
       });
     }
 
     if (inlineComments.length > 0) {
       fileContent += '\n\n---\n\n## Inline Comments\n\n';
       inlineComments.forEach((comment, index) => {
-        fileContent += `${index + 1}. **On text:** "${comment.selected_text}"\n`;
-        fileContent += `   - **From:** ${comment.commenter_email}\n`;
-        fileContent += `   - > ${comment.comment_text.replace(/\n/g, '\n   - > ')}\n`;
+        fileContent += `${index + 1}. **On text:** "${extractSelectedText(comment)}"\n`;
+        fileContent += `   - **From:** ${getCommentAuthor(comment)}\n`;
+        fileContent += `   - > ${extractCommentText(comment).replace(/\n/g, '\n   - > ')}\n`;
         if (comment.replies && comment.replies.length > 0) {
           comment.replies.forEach(reply => {
             fileContent += `   - **Reply from ${reply.author_email}:** ${reply.text}\n`;

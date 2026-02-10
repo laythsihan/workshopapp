@@ -59,6 +59,35 @@ export const User = {
   },
 
   /**
+   * Filter user profiles by criteria
+   * @param {Object} filters - Filter criteria (e.g., { email: 'x@y.com' })
+   * @param {string} sortField - Field to sort by
+   * @param {number} limit - Max number of results
+   * @returns {Promise<Array>} Array of profiles
+   */
+  filter: async (filters = {}, sortField = 'updated_at', limit = 100) => {
+    let query = supabase.from('profiles').select('*');
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        query = query.eq(key, value);
+      }
+    });
+
+    if (sortField) {
+      query = query.order(sortField, { ascending: false });
+    }
+
+    if (limit) {
+      query = query.limit(limit);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
+  /**
    * Update the current user's profile
    * @param {Object} updates - Fields to update
    * @returns {Promise<Object>} Updated profile
@@ -462,10 +491,10 @@ export const Comment = {
         version_id: commentData.version_id || null,
         author_id: user.id,
         content: contentText,
-        comment_text: contentText, // Temporary: Fill both columns until DB migration
         selection_json: commentData.selection_json || null,
         parent_comment_id: commentData.parent_comment_id || null,
-        is_resolved: commentData.is_resolved !== undefined ? commentData.is_resolved : false
+        is_resolved: commentData.is_resolved !== undefined ? commentData.is_resolved : false,
+        ...(commentData.status ? { status: commentData.status } : {})
       }])
       .select()
       .single();

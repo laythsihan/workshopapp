@@ -34,7 +34,7 @@ const TextRenderer = ({ content, comments = [], activeCommentId, onCommentClick 
                 ? "bg-yellow-200 border-yellow-400 text-stone-900" 
                 : "bg-yellow-100/50 border-yellow-200 hover:bg-yellow-200"
             }`}
-            title={comment.comment_text}
+            title={comment.content}
           >
             {content.substring(start, end)}
           </span>

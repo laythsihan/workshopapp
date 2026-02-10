@@ -7,7 +7,7 @@ import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import DashboardShell from '../components/layout/DashboardShell';
 
 // Pages
-import Login from './login';
+import Login from './Login';
 import Dashboard from './dashboard';
 import Workshop from './workshop';
 import Upload from './upload';

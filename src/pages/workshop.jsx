@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase.js";
-import { Comment, Version } from "../api/entities";
+import { Comment } from "../api/entities";
 import { useToast } from "@/components/ui/use-toast";
 
 import TextRenderer from "../components/workshop/TextRenderer";
@@ -62,7 +62,7 @@ export default function WorkshopPage() {
       setUser(authUser);
 
       // Parallel fetch for speed
-      const [pieceRes, versionRes, commentsRes] = await Promise.all([
+      const [pieceRes, versionRes, commentsRes, collaboratorsRes] = await Promise.all([
         supabase.from('pieces').select('*').eq('id', pieceIdFromUrl).maybeSingle(),
         supabase.from('versions')
           .select('*')
@@ -70,7 +70,8 @@ export default function WorkshopPage() {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
-        supabase.from('comments').select('*').eq('piece_id', pieceIdFromUrl)
+        supabase.from('comments').select('*').eq('piece_id', pieceIdFromUrl),
+        supabase.from('collaborators').select('invitee_email').eq('piece_id', pieceIdFromUrl)
       ]);
 
       if (pieceRes.error) throw pieceRes.error;
@@ -81,6 +82,7 @@ export default function WorkshopPage() {
 
       setPiece({
         ...pieceRes.data,
+        collaborators: (collaboratorsRes.data || []).map((row) => row.invitee_email).filter(Boolean),
         content: displayContent
       });
 
@@ -159,22 +161,10 @@ export default function WorkshopPage() {
     if (!tempAnnotation || !user || !piece) return;
 
     try {
-      // 1. Ensure we have a version record to link to (creates one if missing)
-      let vId = currentVersion?.id;
-      if (!vId) {
-        const newV = await Version.create({
-          piece_id: piece.id,
-          content: piece.content,
-          author_id: user.id
-        });
-        vId = newV.id;
-        setCurrentVersion(newV);
-      }
-
-      // 2. Insert the Comment using new API
+      // Link comment to current version when available.
       const newComment = await Comment.create({
         piece_id: piece.id,
-        version_id: vId,
+        version_id: currentVersion?.id || null,
         content: commentText,
         selection_json: {
           text: tempAnnotation.selected_text,
