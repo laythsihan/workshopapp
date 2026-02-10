@@ -2,106 +2,104 @@ import React from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { 
-  BookOpen, 
-  PlusCircle, 
+  LayoutDashboard,
+  PenSquare,
   LogOut, 
-  User, 
-  LayoutDashboard 
+  UserRound
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import SidebarRecentActivity from "../sidebar/RecentActivity";
+import { Badge } from "@/components/ui/badge";
 
-export default function DashboardShell({ children, pieces = [], activity = [], isLoading = false }) {
-  const { signOut, user } = useAuth();
+export default function DashboardShell({ children, user: sharedUser, pieces = [], activity = [], isLoading = false }) {
+  const { signOut, user: authUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const currentUser = sharedUser || authUser;
 
   const handleLogout = async () => {
     await signOut();
-    // Redirect to login and clear navigation history
     navigate("/login", { replace: true });
   };
 
-  // Helper to highlight the active page in the sidebar
   const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="flex min-h-screen bg-stone-50 font-sans">
-      {/* --- LEFT SIDEBAR --- */}
-      <aside className="w-72 bg-white border-r border-stone-200 flex flex-col fixed h-full z-30">
-        {/* Logo Area */}
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-white shadow-lg">
-            <BookOpen className="w-6 h-6" />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-serif font-bold text-xl tracking-tight leading-none">Workshop</span>
-            <span className="text-[10px] text-stone-400 uppercase tracking-widest mt-1">Sovereign v1.0</span>
+    <div className="min-h-screen bg-stone-50">
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 w-80 border-r border-stone-200 bg-white/95 backdrop-blur-sm flex-col z-20">
+        <div className="p-6 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl border border-dashed border-stone-300 bg-stone-50 flex items-center justify-center text-stone-500">
+              <span className="font-serif font-semibold text-lg">W</span>
+            </div>
+            <div>
+              <h1 className="writer-heading text-2xl leading-none">Workshop</h1>
+              <p className="text-xs uppercase tracking-[0.22em] text-stone-400 mt-1">Writing Studio</p>
+            </div>
           </div>
         </div>
 
-        <div className="px-4 py-2">
-          <Separator className="bg-stone-100" />
-        </div>
-
-        {/* Primary Navigation */}
-        <nav className="flex-1 px-4 py-4 space-y-1">
-          <Link to="/dashboard">
+        <nav className="px-4 pt-2 space-y-2">
+          <Link to="/dashboard" className="block">
             <Button 
               variant="ghost" 
-              className={`w-full justify-start gap-3 py-6 px-4 transition-all ${
-                isActive('/dashboard') ? 'bg-stone-100 text-black font-semibold' : 'text-stone-500 hover:bg-stone-50'
+              className={`h-11 w-full justify-start gap-3 rounded-xl px-4 text-sm transition-colors ${
+                isActive('/dashboard')
+                  ? 'bg-stone-900 text-white hover:bg-stone-800'
+                  : 'text-stone-600 hover:bg-stone-100'
               }`}
             >
-              <LayoutDashboard className="w-5 h-5" />
+              <LayoutDashboard className="w-4 h-4" />
               Dashboard
             </Button>
           </Link>
 
-          <Link to="/upload">
+          <Link to="/upload" className="block">
             <Button 
               variant="ghost" 
-              className={`w-full justify-start gap-3 py-6 px-4 transition-all ${
-                isActive('/upload') ? 'bg-stone-100 text-black font-semibold' : 'text-stone-500 hover:bg-stone-50'
+              className={`h-11 w-full justify-start gap-3 rounded-xl px-4 text-sm transition-colors ${
+                isActive('/upload')
+                  ? 'bg-stone-900 text-white hover:bg-stone-800'
+                  : 'text-stone-600 hover:bg-stone-100'
               }`}
             >
-              <PlusCircle className="w-5 h-5" />
+              <PenSquare className="w-4 h-4" />
               New Manuscript
             </Button>
           </Link>
-
-          {/* Activity Feed Section */}
-          <div className="mt-8">
-            <SidebarRecentActivity 
-              comments={activity} 
-              allPieces={pieces} 
-              userId={user?.id} 
-              isLoading={isLoading} 
-            />
-          </div>
         </nav>
 
-        {/* User Account & Logout Section */}
-        <div className="p-4 mt-auto border-t border-stone-100 bg-stone-50/50">
-          <Link to="/profile">
-            <div className="flex items-center gap-3 px-3 py-3 mb-2 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer">
-              <div className="w-8 h-8 rounded-full bg-stone-200 flex items-center justify-center text-stone-500">
-                <User className="w-4 h-4" />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-medium text-stone-900 truncate">
-                  {user?.email?.split('@')[0]}
-                </span>
-                <span className="text-[10px] text-stone-400 truncate tracking-tight">View Profile</span>
+        <div className="px-4 py-4 flex-1 min-h-0">
+          <SidebarRecentActivity 
+            comments={activity} 
+            allPieces={pieces} 
+            userId={currentUser?.id} 
+            isLoading={isLoading} 
+          />
+        </div>
+
+        <div className="p-4 border-t border-stone-200 bg-stone-50/60">
+          <Link to="/profile" className="block mb-3">
+            <div className="rounded-xl border border-stone-200 bg-white px-3 py-3 hover:border-stone-300 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-stone-200 text-stone-700 flex items-center justify-center">
+                  <UserRound className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-stone-900 truncate">
+                    {currentUser?.full_name || currentUser?.email?.split("@")[0] || "Writer"}
+                  </p>
+                  <p className="text-xs text-stone-500 truncate">{currentUser?.email}</p>
+                </div>
               </div>
             </div>
           </Link>
-          
+
           <Button 
-            variant="ghost" 
+            variant="outline" 
             onClick={handleLogout}
-            className="w-full justify-start gap-3 text-stone-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="h-10 w-full justify-start gap-2 border-stone-300 bg-white text-stone-700 hover:bg-stone-100"
           >
             <LogOut className="w-4 h-4" />
             <span className="text-sm font-medium">Sign Out</span>
@@ -109,9 +107,37 @@ export default function DashboardShell({ children, pieces = [], activity = [], i
         </div>
       </aside>
 
-      {/* --- MAIN CONTENT AREA --- */}
-      <main className="flex-1 ml-72 min-h-screen relative">
-        <div className="max-w-6xl mx-auto p-10">
+      {/* Mobile top bar */}
+      <header className="lg:hidden sticky top-0 z-20 border-b border-stone-200 bg-white/95 backdrop-blur-sm">
+        <div className="px-4 py-3 flex items-center justify-between gap-3">
+          <div>
+            <h1 className="writer-heading text-xl">Workshop</h1>
+            <p className="text-[11px] text-stone-500">Writer workspace</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link to="/dashboard">
+              <Button variant={isActive('/dashboard') ? "default" : "outline"} size="sm" className="h-8">
+                Dashboard
+              </Button>
+            </Link>
+            <Link to="/upload">
+              <Button variant={isActive('/upload') ? "default" : "outline"} size="sm" className="h-8">
+                New
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <main className="min-h-screen lg:ml-80">
+        <div className="mx-auto w-full max-w-[1280px] px-4 py-8 md:px-8 md:py-10 xl:px-12 xl:py-12">
+          {!isLoading && pieces.length > 0 && (
+            <div className="mb-6 lg:hidden">
+              <Badge variant="outline" className="rounded-full border-stone-300 bg-white">
+                {pieces.length} manuscripts in your library
+              </Badge>
+            </div>
+          )}
           {children}
         </div>
       </main>

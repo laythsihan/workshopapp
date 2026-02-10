@@ -178,7 +178,9 @@ export default function CommentSidebar({
   );
 
   return (
-    <aside className={`bg-white border-l border-stone-200 flex flex-col h-screen sticky top-0 transition-all duration-300 ${isDesktopCollapsed ? 'w-14' : 'w-[400px]'}`}>
+    <aside className={`bg-white border-t lg:border-t-0 lg:border-l border-stone-200 flex flex-col transition-all duration-300 ${
+      isDesktopCollapsed ? 'lg:w-14' : 'w-full'
+    } lg:sticky lg:top-[72px] lg:h-[calc(100vh-72px)]`}>
       <header className="h-14 flex items-center justify-between px-4 border-b border-stone-200 shrink-0">
         {!isDesktopCollapsed && <h2 className="font-serif font-bold text-stone-800">Feedback</h2>}
         <Button 

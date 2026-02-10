@@ -256,22 +256,22 @@ export default function WorkshopPage() {
   );
 
   return (
-    <div className="min-h-screen bg-stone-50/50 flex flex-col lg:flex-row overflow-hidden">
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        <WorkshopHeader 
-          piece={piece}
-          user={user}
-          isEditing={isEditing} 
-          onToggleEdit={() => setIsEditing(!isEditing)}
-          onPieceUpdate={loadData}
-          comments={comments}
-          onSubmitReview={loadData}
-        />
-        
-        <main className="flex-1 overflow-y-auto p-4 md:p-12">
+    <div className="min-h-screen bg-stone-50">
+      <WorkshopHeader 
+        piece={piece}
+        user={user}
+        isEditing={isEditing} 
+        onToggleEdit={() => setIsEditing(!isEditing)}
+        onPieceUpdate={loadData}
+        comments={comments}
+        onSubmitReview={loadData}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)] min-h-[calc(100vh-72px)]">
+        <main className="overflow-y-auto px-4 py-6 md:px-8 lg:px-10 xl:px-14">
           <article 
             ref={articleRef} 
-            className="max-w-3xl mx-auto bg-white shadow-sm border border-stone-200 p-8 md:p-16 rounded-sm relative min-h-[80vh]"
+            className="writer-surface relative max-w-4xl mx-auto p-6 md:p-10 lg:p-12 min-h-[78vh]"
           >
             <TextRenderer 
               content={piece?.content || ""} 
@@ -291,23 +291,23 @@ export default function WorkshopPage() {
             )}
           </article>
         </main>
-      </div>
 
-      <CommentSidebar 
-        piece={piece}
-        comments={comments}
-        tempAnnotation={tempAnnotation}
-        onSaveTempAnnotation={handleSaveComment}
-        onCancelTempAnnotation={() => setTempAnnotation(null)}
-        activeCommentId={activeCommentId}
-        setActiveCommentId={setActiveCommentId}
-        isDesktopCollapsed={isDesktopCollapsed}
-        setIsDesktopCollapsed={setIsDesktopCollapsed}
-        currentUser={user}
-        canParticipate={canParticipate}
-        isCompleted={piece?.status === "completed"}
-        onCommentUpdate={loadData} // Refetch data when children components update
-      />
+        <CommentSidebar 
+          piece={piece}
+          comments={comments}
+          tempAnnotation={tempAnnotation}
+          onSaveTempAnnotation={handleSaveComment}
+          onCancelTempAnnotation={() => setTempAnnotation(null)}
+          activeCommentId={activeCommentId}
+          setActiveCommentId={setActiveCommentId}
+          isDesktopCollapsed={isDesktopCollapsed}
+          setIsDesktopCollapsed={setIsDesktopCollapsed}
+          currentUser={user}
+          canParticipate={canParticipate}
+          isCompleted={piece?.status === "completed"}
+          onCommentUpdate={loadData} // Refetch data when children components update
+        />
+      </div>
     </div>
   );
 }

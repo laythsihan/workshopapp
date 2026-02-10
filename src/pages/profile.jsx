@@ -131,7 +131,7 @@ export default function ProfilePage({ user: propUser, pieces = [], onRefresh }) 
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-transparent p-6">
+      <div className="min-h-screen bg-transparent">
         <div className="max-w-4xl mx-auto">
           <div className="animate-pulse space-y-6">
             <div className="h-8 bg-gray-200 rounded w-1/3"></div>
@@ -144,11 +144,11 @@ export default function ProfilePage({ user: propUser, pieces = [], onRefresh }) 
   }
 
   return (
-    <div className="min-h-screen bg-transparent p-6">
+    <div className="min-h-screen bg-transparent">
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div>
-          <h1 className="text-4xl font-bold text-stone-800 mb-2">
+          <h1 className="writer-heading text-4xl md:text-5xl mb-2">
             Profile Settings
           </h1>
           <p className="text-stone-600 text-lg">
@@ -173,9 +173,9 @@ export default function ProfilePage({ user: propUser, pieces = [], onRefresh }) 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Profile Info */}
           <div className="lg:col-span-2">
-            <Card className="bg-white/80 backdrop-blur-sm border-stone-200/50">
+            <Card className="writer-surface border-stone-200/70">
               <CardHeader>
-                <CardTitle className="text-xl text-stone-800">
+                <CardTitle className="writer-heading text-2xl text-stone-800">
                   Profile Information
                 </CardTitle>
               </CardHeader>
@@ -311,9 +311,9 @@ export default function ProfilePage({ user: propUser, pieces = [], onRefresh }) 
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Account Summary */}
-            <Card className="bg-white/80 backdrop-blur-sm border-stone-200/50">
+            <Card className="writer-surface border-stone-200/70">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg text-stone-800">
+                <CardTitle className="flex items-center gap-2 text-lg text-stone-800 font-serif">
                   Account Summary
                 </CardTitle>
               </CardHeader>
@@ -330,7 +330,7 @@ export default function ProfilePage({ user: propUser, pieces = [], onRefresh }) 
                   <Calendar className="w-4 h-4 text-stone-600" />
                   <div>
                     <p className="text-sm font-medium text-stone-800">
-                      {user?.created_date ? format(new Date(user.created_date), 'MMM d, yyyy') : 'Unknown'}
+                      {user?.created_at ? format(new Date(user.created_at), 'MMM d, yyyy') : 'Unknown'}
                     </p>
                     <p className="text-xs text-stone-500">Member Since</p>
                   </div>
@@ -345,9 +345,9 @@ export default function ProfilePage({ user: propUser, pieces = [], onRefresh }) 
             </Card>
 
             {/* Quick Actions */}
-            <Card className="bg-white/80 backdrop-blur-sm border-stone-200/50">
+            <Card className="writer-surface border-stone-200/70">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg text-stone-800">
+                <CardTitle className="flex items-center gap-2 text-lg text-stone-800 font-serif">
                   <Edit3 className="w-5 h-5 text-stone-600" />
                   Quick Actions
                 </CardTitle>
@@ -385,9 +385,9 @@ export default function ProfilePage({ user: propUser, pieces = [], onRefresh }) 
             </Card>
 
             {/* My Manuscripts */}
-            <Card className="bg-white/80 backdrop-blur-sm border-stone-200/50">
+            <Card className="writer-surface border-stone-200/70">
               <CardHeader>
-                <CardTitle className="flex items-center justify-between text-lg text-stone-800">
+                <CardTitle className="flex items-center justify-between text-lg text-stone-800 font-serif">
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-5 h-5 text-stone-600" />
                     My Manuscripts
