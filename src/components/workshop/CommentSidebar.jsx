@@ -3,7 +3,7 @@ import CommentCard from "./CommentCard";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { MessageCircle, PanelRightClose, Search, SlidersHorizontal } from "lucide-react";
+import { CheckCircle2, MessageCircle, PanelRightClose, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -16,16 +16,19 @@ export default function CommentSidebar({
   onCancelTempAnnotation,
   collaboratorColors = {},
   currentUser,
+  canParticipate = false,
+  isCompleted = false,
   onCommentUpdate,
   activeCommentId,
   setActiveCommentId,
   visibleCommenters = {},
-  setVisibleCommenters,
+  setVisibleCommenters = () => {},
   isDesktopCollapsed,
   setIsDesktopCollapsed
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [commentTypeFilter, setCommentTypeFilter] = useState("all");
+  const [showResolved, setShowResolved] = useState(false);
   const scrollContainerRef = useRef(null);
 
   // 1. Map commenters for the filter list (Normalizing for author_id)
@@ -59,9 +62,14 @@ export default function CommentSidebar({
           if (type !== commentTypeFilter) return false;
         }
 
+        // Hide resolved threads by default to reduce manuscript noise.
+        if (!showResolved && comment.is_resolved) {
+          return false;
+        }
+
         return true;
       });
-  }, [comments, visibleCommenters, searchQuery, commentTypeFilter]);
+  }, [comments, visibleCommenters, searchQuery, commentTypeFilter, showResolved]);
 
   // 3. Auto-scroll to active comment when it changes
   useEffect(() => {
@@ -99,6 +107,15 @@ export default function CommentSidebar({
                 <SelectItem value="strikethrough">Strikethrough</SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              variant={showResolved ? "secondary" : "outline"}
+              size="sm"
+              className="h-8 px-2 text-xs"
+              onClick={() => setShowResolved((prev) => !prev)}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+              Resolved
+            </Button>
           </div>
         </div>
       )}
@@ -150,6 +167,8 @@ export default function CommentSidebar({
                 onCommentUpdate={onCommentUpdate}
                 isActive={activeCommentId === comment.id}
                 onClick={() => setActiveCommentId(comment.id)}
+                canParticipate={canParticipate}
+                isCompleted={isCompleted}
               />
             </div>
           ))
@@ -159,7 +178,9 @@ export default function CommentSidebar({
   );
 
   return (
-    <aside className={`bg-white border-l border-stone-200 flex flex-col h-screen sticky top-0 transition-all duration-300 ${isDesktopCollapsed ? 'w-14' : 'w-[400px]'}`}>
+    <aside className={`bg-white border-t lg:border-t-0 lg:border-l border-stone-200 flex flex-col transition-all duration-300 ${
+      isDesktopCollapsed ? 'lg:w-14' : 'w-full'
+    } lg:sticky lg:top-[72px] lg:h-[calc(100vh-72px)]`}>
       <header className="h-14 flex items-center justify-between px-4 border-b border-stone-200 shrink-0">
         {!isDesktopCollapsed && <h2 className="font-serif font-bold text-stone-800">Feedback</h2>}
         <Button 
@@ -192,7 +213,7 @@ function TempAnnotationForm({ tempAnnotation, onSave, onCancel }) {
       <Textarea
         value={commentText}
         onChange={(e) => setCommentText(e.target.value)}
-        placeholder="Add your thoughts..."
+        placeholder="Add your feedback..."
         className="mb-3 bg-white border-blue-200 focus-visible:ring-blue-400 min-h-[100px]"
         autoFocus
       />

@@ -4,10 +4,17 @@ module.exports = {
     content: ["./index.html", "./src/**/*.{ts,tsx,js,jsx}"],
   theme: {
   	extend: {
+  		fontFamily: {
+  			sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+  			serif: ['"Source Serif 4"', 'ui-serif', 'Georgia', 'serif']
+  		},
   		borderRadius: {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		boxShadow: {
+  			writer: '0 8px 30px -12px rgba(20, 20, 20, 0.18)'
   		},
   		colors: {
   			background: 'hsl(var(--background))',

@@ -4,36 +4,43 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, MapPin, Link as LinkIcon, AlertCircle } from 'lucide-react';
 
-export default function UserProfileCard({ email }) {
+export default function UserProfileCard({ userId, email }) {
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
-      if (!email) {
-        setError("No email provided.");
-        setIsLoading(false);
-        return;
-      }
       setIsLoading(true);
       setError(null);
+
       try {
-        const users = await User.filter({ email: email }, '', 1);
-        if (users && users.length > 0) {
-          setUserData(users[0]);
+        if (userId) {
+          const profile = await User.get(userId);
+          if (profile) {
+            setUserData(profile);
+          } else {
+            setError("User not found.");
+          }
+        } else if (email) {
+          // Fallback for places where only email is available.
+          setUserData({
+            full_name: email.split("@")[0],
+            email
+          });
         } else {
-          setError("User not found.");
+          setError("No user info provided.");
         }
       } catch (err) {
         console.error("Error fetching user data:", err);
         setError("Failed to fetch user data.");
       }
+
       setIsLoading(false);
     };
 
     fetchUserData();
-  }, [email]);
+  }, [userId, email]);
 
   if (isLoading) {
     return (
@@ -51,7 +58,7 @@ export default function UserProfileCard({ email }) {
         <CardContent className="p-6 flex flex-col items-center justify-center text-center h-48">
           <AlertCircle className="w-8 h-8 text-red-400 mb-2"/>
           <p className="font-semibold text-red-700">{error}</p>
-          <p className="text-sm text-stone-500">{email}</p>
+          <p className="text-sm text-stone-500">{email || userId}</p>
         </CardContent>
       </Card>
     );

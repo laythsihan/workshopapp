@@ -13,7 +13,7 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
-import { Upload, FileUp, Loader2, X } from "lucide-react";
+import { Upload, FileUp, Loader2, X, Plus, Users } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import mammoth from "mammoth";
 import * as pdfjsLib from "pdfjs-dist";
@@ -34,14 +34,14 @@ export default function UploadPage({ onRefresh }) {
   const [content, setContent] = useState("");
   const [genre, setGenre] = useState("");
   const [uploadedFileName, setUploadedFileName] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [inviteInput, setInviteInput] = useState("");
+  const [invitedReviewers, setInvitedReviewers] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
 
-  // Track whether content came from file or manual entry
-  const isFileMode = uploadedFileName !== "";
-  const isTextMode = content.trim().length > 0 && !isFileMode;
+  const hasUploadedFile = uploadedFileName !== "";
 
-  // --- PDF PROCESSING ---
   const processPDF = async (file) => {
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -57,62 +57,57 @@ export default function UploadPage({ onRefresh }) {
     return fullText.trim();
   };
 
-  // --- DOCX PROCESSING ---
   const processDOCX = async (file) => {
     const arrayBuffer = await file.arrayBuffer();
     const result = await mammoth.extractRawText({ arrayBuffer });
     return result.value;
   };
 
-  // --- FILE PROCESSING LOGIC ---
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
+  const parseFileToText = async (file) => {
+    if (file.type === "application/pdf") {
+      return processPDF(file);
+    }
+
+    if (
+      file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      file.type === "application/msword" ||
+      file.name.toLowerCase().endsWith(".docx") ||
+      file.name.toLowerCase().endsWith(".doc")
+    ) {
+      return processDOCX(file);
+    }
+
+    if (file.type === "text/plain" || file.name.toLowerCase().endsWith(".txt")) {
+      return file.text();
+    }
+
+    throw new Error("Unsupported file type. Please upload PDF, DOCX, DOC, or TXT.");
+  };
+
+  const handleSelectedFile = async (file) => {
     if (!file) return;
 
     setIsParsing(true);
-    
-    // Auto-fill title from filename if empty
-    if (!title) {
-      setTitle(file.name.replace(/\.[^/.]+$/, ""));
-    }
-    setUploadedFileName(file.name);
+    setIsDragOver(false);
 
     try {
-      let extractedText = "";
-
-      if (file.type === "application/pdf") {
-        console.log("Processing PDF...");
-        extractedText = await processPDF(file);
-        toast({ title: "PDF processed successfully" });
-      } 
-      else if (
-        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-        file.type === "application/msword"
-      ) {
-        console.log("Processing DOCX/DOC...");
-        extractedText = await processDOCX(file);
-        toast({ title: "Document processed successfully" });
-      } 
-      else if (file.type === "text/plain" || file.name.endsWith(".txt")) {
-        console.log("Processing TXT...");
-        extractedText = await file.text();
-        toast({ title: "Text file loaded successfully" });
-      }
-      else {
-        throw new Error("Unsupported file type");
-      }
+      const extractedText = await parseFileToText(file);
 
       if (!extractedText.trim()) {
-        throw new Error("No text could be extracted from the file");
+        throw new Error("No readable text was found in that file.");
       }
 
+      if (!title.trim()) {
+        setTitle(file.name.replace(/\.[^/.]+$/, ""));
+      }
+      setUploadedFileName(file.name);
       setContent(extractedText);
-
+      toast({ title: "File parsed successfully" });
     } catch (error) {
       console.error("File processing error:", error);
       toast({ 
         title: "Processing error", 
-        description: error.message || "Could not extract text from file. Please try again.", 
+        description: error.message || "Could not extract text from file. Please try again.",
         variant: "destructive" 
       });
       setUploadedFileName("");
@@ -122,14 +117,58 @@ export default function UploadPage({ onRefresh }) {
     }
   };
 
-  // Clear uploaded file - allows switching to text mode
-  const handleClearFile = () => {
-    setContent("");
-    setUploadedFileName("");
-    setTitle("");
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    await handleSelectedFile(file);
   };
 
-  // --- VALIDATION ---
+  const handleDrop = async (event) => {
+    event.preventDefault();
+    const file = event.dataTransfer?.files?.[0];
+    await handleSelectedFile(file);
+  };
+
+  const handleDragOver = (event) => {
+    event.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (event) => {
+    event.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleClearFile = () => {
+    setUploadedFileName("");
+  };
+
+  const addReviewer = () => {
+    const normalized = inviteInput.trim().toLowerCase();
+    if (!normalized) return;
+
+    const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized);
+    if (!isValidEmail) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid reviewer email.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (invitedReviewers.includes(normalized)) {
+      setInviteInput("");
+      return;
+    }
+
+    setInvitedReviewers((prev) => [...prev, normalized]);
+    setInviteInput("");
+  };
+
+  const removeReviewer = (email) => {
+    setInvitedReviewers((prev) => prev.filter((item) => item !== email));
+  };
+
   const validateForm = () => {
     if (!title.trim()) {
       toast({ 
@@ -143,7 +182,7 @@ export default function UploadPage({ onRefresh }) {
     if (!content.trim()) {
       toast({ 
         title: "Content required", 
-        description: "Please upload a file or paste your text.",
+        description: "Please upload a manuscript file or paste your text.",
         variant: "destructive" 
       });
       return false;
@@ -152,7 +191,6 @@ export default function UploadPage({ onRefresh }) {
     return true;
   };
 
-  // --- DATABASE SYNC LOGIC ---
   const handleUpload = async (e) => {
     e.preventDefault();
     
@@ -166,20 +204,19 @@ export default function UploadPage({ onRefresh }) {
         title: title.trim(),
         content: content.trim(),
         genre: genre.trim() || "Uncategorized",
-        status: "draft"
+        status: "draft",
+        collaborators: invitedReviewers
       });
 
       toast({ 
-        title: "Upload successful!", 
-        description: "Your manuscript is ready for workshopping." 
+        title: "Manuscript uploaded",
+        description: "Your piece is now in your library."
       });
 
-      // Refresh the pieces list in the app
       if (onRefresh) {
         await onRefresh();
       }
       
-      // Navigate to workshop
       navigate(`/workshop?piece=${newPiece.id}`);
 
     } catch (error) {
@@ -197,30 +234,84 @@ export default function UploadPage({ onRefresh }) {
   const wordCount = content.trim().split(/\s+/).filter(w => w).length;
 
   return (
-    <div className="max-w-4xl mx-auto py-10 px-4">
-      <Card className="border-stone-200 shadow-sm">
+    <div className="max-w-5xl mx-auto">
+      <Card className="writer-surface border-stone-200/80">
         <CardHeader>
-          <CardTitle className="text-2xl font-serif text-stone-900">Upload Manuscript</CardTitle>
+          <CardTitle className="writer-heading text-3xl">New Manuscript</CardTitle>
           <CardDescription>
-            {isFileMode 
-              ? "File uploaded. Review the extracted text below or clear to start over."
-              : "Upload a file (PDF, DOCX, DOC, or TXT) OR paste your text below."
-            }
+            Upload a file, add reviewer emails, and start your workshop.
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleUpload}>
-          <CardContent className="space-y-6">
-            
-            {/* File Upload Area */}
-            {isFileMode ? (
-              // FILE UPLOADED - Show file info with clear button
-              <div className="p-6 border-2 border-green-200 rounded-lg bg-green-50 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <FileUp className="w-6 h-6 text-green-600" />
+          <CardContent className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-2">
+                <Label htmlFor="title" className="text-stone-700">
+                  Title <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="title"
+                  placeholder="e.g., The Last Summer in Aleppo"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="h-11 border-stone-300"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="genre" className="text-stone-700">Genre</Label>
+                <Input
+                  id="genre"
+                  placeholder="Literary Fiction"
+                  value={genre}
+                  onChange={(e) => setGenre(e.target.value)}
+                  className="h-11 border-stone-300"
+                />
+              </div>
+            </div>
+
+            <div
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`rounded-2xl border-2 border-dashed p-8 transition-colors ${
+                isDragOver ? "border-stone-400 bg-stone-100" : "border-stone-300 bg-stone-50"
+              }`}
+            >
+              <div className="text-center">
+                <FileUp className="w-10 h-10 mx-auto text-stone-500 mb-3" />
+                <p className="font-medium text-stone-800">Drag & drop manuscript file</p>
+                <p className="text-sm text-stone-500 mt-1">Accepts .pdf, .docx, .doc, and .txt</p>
+                <Label
+                  htmlFor="file-input"
+                  className="inline-flex mt-4 cursor-pointer rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm text-stone-700 hover:bg-stone-100"
+                >
+                  Browse files
+                </Label>
+                <input
+                  id="file-input"
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.docx,.doc,.txt"
+                  onChange={handleFileChange}
+                />
+                {isParsing && (
+                  <div className="mt-3 inline-flex items-center gap-2 text-sm text-stone-600">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Parsing manuscript...
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {hasUploadedFile && (
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <FileUp className="w-5 h-5 text-stone-500 shrink-0" />
                   <div>
-                    <p className="font-medium text-green-900">{uploadedFileName}</p>
-                    <p className="text-sm text-green-700">
-                      {wordCount.toLocaleString()} words extracted
+                    <p className="font-medium text-stone-800 truncate">{uploadedFileName}</p>
+                    <p className="text-sm text-stone-500">
+                      {wordCount.toLocaleString()} words loaded
                     </p>
                   </div>
                 </div>
@@ -229,123 +320,76 @@ export default function UploadPage({ onRefresh }) {
                   variant="ghost"
                   size="icon"
                   onClick={handleClearFile}
-                  className="text-green-700 hover:text-green-900 hover:bg-green-100"
-                  title="Clear file and start over"
+                  className="text-stone-500 hover:text-stone-800"
+                  title="Remove file link"
                 >
                   <X className="w-5 h-5" />
                 </Button>
               </div>
-            ) : (
-              // NO FILE - Show upload area (disabled if text entered)
-              <div className={`p-10 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-4 transition-all ${
-                isTextMode 
-                  ? 'border-stone-100 bg-stone-50 opacity-50 cursor-not-allowed' 
-                  : 'border-stone-200 bg-stone-50/50 hover:bg-stone-50'
-              }`}>
-                <FileUp className={`w-10 h-10 ${isTextMode ? 'text-stone-300' : 'text-stone-400'}`} />
-                <div className="text-center">
-                  <Label 
-                    htmlFor="file-input" 
-                    className={`text-lg font-medium ${
-                      isTextMode 
-                        ? 'text-stone-400 cursor-not-allowed' 
-                        : 'cursor-pointer text-blue-600 hover:text-blue-800'
-                    }`}
-                  >
-                    Click to choose a file
-                  </Label>
-                  <p className="text-sm text-stone-500 mt-1">
-                    Accepts PDF, DOCX, DOC, or TXT files
-                  </p>
-                  {isTextMode && (
-                    <p className="text-xs text-stone-500 mt-2 font-medium">
-                      Clear text below to upload a file instead
-                    </p>
-                  )}
-                </div>
-                <input 
-                  id="file-input" 
-                  type="file" 
-                  className="hidden" 
-                  accept=".pdf,.docx,.doc,.txt"
-                  onChange={handleFileChange}
-                  disabled={isTextMode}
-                />
-                {isParsing && (
-                  <div className="flex items-center gap-2 text-sm text-stone-600 animate-pulse">
-                    <Loader2 className="w-4 h-4 animate-spin"/> Extracting text from file...
-                  </div>
-                )}
-              </div>
             )}
 
-            {/* Title and Genre */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="title">
-                  Manuscript Title <span className="text-red-500">*</span>
-                </Label>
+            <div className="space-y-2">
+              <Label htmlFor="invite-reviewers" className="text-stone-700">
+                Invite Reviewers
+              </Label>
+              <div className="flex gap-2">
                 <Input
-                  id="title"
-                  placeholder="e.g., The Midnight Library"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
+                  id="invite-reviewers"
+                  value={inviteInput}
+                  onChange={(e) => setInviteInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addReviewer();
+                    }
+                  }}
+                  placeholder="reviewer@email.com"
+                  className="h-11 border-stone-300"
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 border-stone-300"
+                  onClick={addReviewer}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Add
+                </Button>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="genre">Genre (Optional)</Label>
-                <Input
-                  id="genre"
-                  placeholder="e.g., Literary Fiction"
-                  value={genre}
-                  onChange={(e) => setGenre(e.target.value)}
-                />
+              <div className="flex flex-wrap gap-2 min-h-6">
+                {invitedReviewers.map((email) => (
+                  <div key={email} className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-3 py-1 text-xs text-stone-700">
+                    <Users className="w-3 h-3" />
+                    {email}
+                    <button
+                      type="button"
+                      onClick={() => removeReviewer(email)}
+                      className="text-stone-400 hover:text-stone-700"
+                      aria-label={`Remove ${email}`}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Text Area - DISABLED if file uploaded, EDITABLE otherwise */}
             <div className="space-y-2">
               <Label htmlFor="content">
                 Manuscript Text <span className="text-red-500">*</span>
-                {isFileMode && (
-                  <span className="text-xs text-green-600 ml-2 font-normal">
-                    ✓ Text extracted from file
-                  </span>
-                )}
               </Label>
               <Textarea
                 id="content"
-                placeholder={isFileMode 
-                  ? "" 
-                  : "Paste your text here, or upload a file above..."
-                }
-                className={`min-h-[400px] font-serif text-base leading-relaxed ${
-                  isFileMode 
-                    ? 'bg-stone-100 text-stone-400 cursor-not-allowed opacity-60' 
-                    : 'bg-white'
-                }`}
-                value={isFileMode ? "" : content}
+                placeholder="Paste your manuscript text here, or upload a file above..."
+                className="min-h-[320px] font-serif text-base leading-relaxed border-stone-300 bg-white"
+                value={content}
                 onChange={(e) => setContent(e.target.value)}
-                disabled={isFileMode || isParsing}
-                required={!isFileMode}
+                disabled={isParsing}
+                required
               />
               <div className="flex justify-between items-center">
-                <p className="text-xs text-stone-500">
-                  {isFileMode ? `${wordCount.toLocaleString()} words in uploaded file` : `${wordCount.toLocaleString()} words`}
-                </p>
-                {isFileMode && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleClearFile}
-                    className="text-xs text-stone-500 hover:text-stone-700"
-                  >
-                    Clear file to enter text manually instead
-                  </Button>
-                )}
+                <p className="text-xs text-stone-500">{wordCount.toLocaleString()} words</p>
+                <p className="text-xs text-stone-500">{invitedReviewers.length} reviewer(s) invited</p>
               </div>
             </div>
           </CardContent>
@@ -361,8 +405,8 @@ export default function UploadPage({ onRefresh }) {
             </Button>
             <Button 
               type="submit" 
-              className="bg-black text-white hover:bg-stone-800 px-8"
-              disabled={isUploading || isParsing || !title.trim() || !content.trim()}
+              className="h-11 rounded-xl bg-stone-900 text-white hover:bg-stone-800 px-8"
+              disabled={isUploading || isParsing}
             >
               {isUploading ? (
                 <>
@@ -372,7 +416,7 @@ export default function UploadPage({ onRefresh }) {
               ) : (
                 <>
                   <Upload className="mr-2 h-4 w-4" />
-                  Start Workshop
+                  Create Manuscript
                 </>
               )}
             </Button>

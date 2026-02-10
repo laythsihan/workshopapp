@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase.js";
-import { Comment, Version } from "../api/entities";
+import { Comment } from "../api/entities";
 import { useToast } from "@/components/ui/use-toast";
 
 import TextRenderer from "../components/workshop/TextRenderer";
@@ -34,6 +34,21 @@ export default function WorkshopPage() {
     [location.search]
   );
 
+  const normalizedUserEmail = user?.email?.toLowerCase();
+  const isOwner = !!piece && user?.id === piece.owner_id;
+  const isInvitedReviewer = !!piece && !!normalizedUserEmail && (piece.collaborators || []).some(
+    (email) => email?.toLowerCase() === normalizedUserEmail
+  );
+  const canParticipate = isOwner || isInvitedReviewer;
+  const canUseHighlightTools = isInvitedReviewer && piece?.status !== "completed" && !isEditing;
+
+  useEffect(() => {
+    if (!canUseHighlightTools) {
+      setSelection(null);
+      setTempAnnotation(null);
+    }
+  }, [canUseHighlightTools]);
+
   /**
    * Helper: Formats database comments for the TextRenderer.
    * Ensures UI-specific fields like position_start are mapped from JSONB.
@@ -62,7 +77,7 @@ export default function WorkshopPage() {
       setUser(authUser);
 
       // Parallel fetch for speed
-      const [pieceRes, versionRes, commentsRes] = await Promise.all([
+      const [pieceRes, versionRes, commentsRes, collaboratorsRes] = await Promise.all([
         supabase.from('pieces').select('*').eq('id', pieceIdFromUrl).maybeSingle(),
         supabase.from('versions')
           .select('*')
@@ -70,7 +85,11 @@ export default function WorkshopPage() {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
-        supabase.from('comments').select('*').eq('piece_id', pieceIdFromUrl)
+        supabase.from('comments')
+          .select('*')
+          .eq('piece_id', pieceIdFromUrl)
+          .order('created_at', { ascending: true }),
+        supabase.from('collaborators').select('invitee_email').eq('piece_id', pieceIdFromUrl)
       ]);
 
       if (pieceRes.error) throw pieceRes.error;
@@ -81,6 +100,7 @@ export default function WorkshopPage() {
 
       setPiece({
         ...pieceRes.data,
+        collaborators: (collaboratorsRes.data || []).map((row) => row.invitee_email).filter(Boolean),
         content: displayContent
       });
 
@@ -123,58 +143,73 @@ export default function WorkshopPage() {
    * Text Selection: Captures offsets and coordinates for the toolbar.
    */
   useEffect(() => {
+    const calculateOffsets = (range, rootElement) => {
+      const preSelectionRange = range.cloneRange();
+      preSelectionRange.selectNodeContents(rootElement);
+      preSelectionRange.setEnd(range.startContainer, range.startOffset);
+      const start = preSelectionRange.toString().length;
+      const selectedTextLength = range.toString().length;
+      const end = start + selectedTextLength;
+      return { start, end };
+    };
+
     const handleMouseUp = () => {
       const sel = window.getSelection();
-      const text = sel.toString().trim();
-      
-      if (text && articleRef.current?.contains(sel.anchorNode)) {
-        const range = sel.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        const containerRect = articleRef.current.getBoundingClientRect();
-        
-        setSelection({
-          text,
-          rect: {
-            top: rect.top - containerRect.top,
-            left: rect.left - containerRect.left,
-            width: rect.width,
-            height: rect.height
-          },
-          start: range.startOffset,
-          end: range.endOffset
-        });
-      } else {
+      if (!sel || sel.rangeCount === 0) {
         setSelection(null);
+        return;
       }
+
+      const range = sel.getRangeAt(0);
+      const rootElement = articleRef.current?.querySelector('[data-manuscript-root="true"]');
+      if (!rootElement || !rootElement.contains(range.commonAncestorContainer)) {
+        setSelection(null);
+        return;
+      }
+
+      const rawText = range.toString();
+      const text = rawText.trim();
+      if (!text) {
+        setSelection(null);
+        return;
+      }
+
+      const { start, end } = calculateOffsets(range, rootElement);
+      if (start < 0 || end <= start || end > (piece?.content || "").length) {
+        setSelection(null);
+        return;
+      }
+
+      const rect = range.getBoundingClientRect();
+      const containerRect = articleRef.current.getBoundingClientRect();
+      setSelection({
+        text,
+        rect: {
+          top: rect.top - containerRect.top,
+          left: rect.left - containerRect.left,
+          width: rect.width,
+          height: rect.height,
+        },
+        start,
+        end,
+      });
     };
 
     document.addEventListener("mouseup", handleMouseUp);
     return () => document.removeEventListener("mouseup", handleMouseUp);
-  }, []);
+  }, [piece?.content]);
 
   /**
    * Save Handler: Posts new comments/highlights to Supabase.
    */
   const handleSaveComment = async (commentText) => {
-    if (!tempAnnotation || !user || !piece) return;
+    if (!tempAnnotation || !user || !piece || !canUseHighlightTools) return;
 
     try {
-      // 1. Ensure we have a version record to link to (creates one if missing)
-      let vId = currentVersion?.id;
-      if (!vId) {
-        const newV = await Version.create({
-          piece_id: piece.id,
-          content: piece.content,
-          author_id: user.id
-        });
-        vId = newV.id;
-        setCurrentVersion(newV);
-      }
-
-      // 2. Insert the Comment using new API
+      // Link comment to current version when available.
       const newComment = await Comment.create({
         piece_id: piece.id,
-        version_id: vId,
+        version_id: currentVersion?.id || null,
         content: commentText,
         selection_json: {
           text: tempAnnotation.selected_text,
@@ -221,31 +256,32 @@ export default function WorkshopPage() {
   );
 
   return (
-    <div className="min-h-screen bg-stone-50/50 flex flex-col lg:flex-row overflow-hidden">
-      <div className="flex-1 flex flex-col min-w-0 relative">
-        <WorkshopHeader 
-          piece={piece}
-          user={user}
-          isEditing={isEditing} 
-          onToggleEdit={() => setIsEditing(!isEditing)}
-          onPieceUpdate={loadData}
-          comments={comments}
-          onSubmitReview={loadData}
-        />
-        
-        <main className="flex-1 overflow-y-auto p-4 md:p-12">
+    <div className="min-h-screen bg-stone-50">
+      <WorkshopHeader 
+        piece={piece}
+        user={user}
+        isEditing={isEditing} 
+        onToggleEdit={() => setIsEditing(!isEditing)}
+        onPieceUpdate={loadData}
+        comments={comments}
+        onSubmitReview={loadData}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)] min-h-[calc(100vh-72px)]">
+        <main className="overflow-y-auto px-4 py-6 md:px-8 lg:px-10 xl:px-14">
           <article 
             ref={articleRef} 
-            className="max-w-3xl mx-auto bg-white shadow-sm border border-stone-200 p-8 md:p-16 rounded-sm relative min-h-[80vh]"
+            className="writer-surface relative max-w-4xl mx-auto p-6 md:p-10 lg:p-12 min-h-[78vh]"
           >
             <TextRenderer 
               content={piece?.content || ""} 
               comments={comments} 
               activeCommentId={activeCommentId} 
               onCommentClick={setActiveCommentId} 
+              draftAnnotation={tempAnnotation}
             />
             
-            {!isEditing && (
+            {canUseHighlightTools && (
               <SelectionToolbar 
                 selection={selection} 
                 onAnnotate={(temp) => {
@@ -255,21 +291,23 @@ export default function WorkshopPage() {
             )}
           </article>
         </main>
-      </div>
 
-      <CommentSidebar 
-        piece={piece}
-        comments={comments}
-        tempAnnotation={tempAnnotation}
-        onSaveTempAnnotation={handleSaveComment}
-        onCancelTempAnnotation={() => setTempAnnotation(null)}
-        activeCommentId={activeCommentId}
-        setActiveCommentId={setActiveCommentId}
-        isDesktopCollapsed={isDesktopCollapsed}
-        setIsDesktopCollapsed={setIsDesktopCollapsed}
-        currentUser={user}
-        onCommentUpdate={loadData} // Refetch data when children components update
-      />
+        <CommentSidebar 
+          piece={piece}
+          comments={comments}
+          tempAnnotation={tempAnnotation}
+          onSaveTempAnnotation={handleSaveComment}
+          onCancelTempAnnotation={() => setTempAnnotation(null)}
+          activeCommentId={activeCommentId}
+          setActiveCommentId={setActiveCommentId}
+          isDesktopCollapsed={isDesktopCollapsed}
+          setIsDesktopCollapsed={setIsDesktopCollapsed}
+          currentUser={user}
+          canParticipate={canParticipate}
+          isCompleted={piece?.status === "completed"}
+          onCommentUpdate={loadData} // Refetch data when children components update
+        />
+      </div>
     </div>
   );
 }
