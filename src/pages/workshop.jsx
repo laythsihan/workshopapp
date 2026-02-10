@@ -34,6 +34,21 @@ export default function WorkshopPage() {
     [location.search]
   );
 
+  const normalizedUserEmail = user?.email?.toLowerCase();
+  const isOwner = !!piece && user?.id === piece.owner_id;
+  const isInvitedReviewer = !!piece && !!normalizedUserEmail && (piece.collaborators || []).some(
+    (email) => email?.toLowerCase() === normalizedUserEmail
+  );
+  const canParticipate = isOwner || isInvitedReviewer;
+  const canUseHighlightTools = isInvitedReviewer && piece?.status !== "completed" && !isEditing;
+
+  useEffect(() => {
+    if (!canUseHighlightTools) {
+      setSelection(null);
+      setTempAnnotation(null);
+    }
+  }, [canUseHighlightTools]);
+
   /**
    * Helper: Formats database comments for the TextRenderer.
    * Ensures UI-specific fields like position_start are mapped from JSONB.
@@ -70,7 +85,10 @@ export default function WorkshopPage() {
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
-        supabase.from('comments').select('*').eq('piece_id', pieceIdFromUrl),
+        supabase.from('comments')
+          .select('*')
+          .eq('piece_id', pieceIdFromUrl)
+          .order('created_at', { ascending: true }),
         supabase.from('collaborators').select('invitee_email').eq('piece_id', pieceIdFromUrl)
       ]);
 
@@ -125,40 +143,67 @@ export default function WorkshopPage() {
    * Text Selection: Captures offsets and coordinates for the toolbar.
    */
   useEffect(() => {
+    const calculateOffsets = (range, rootElement) => {
+      const preSelectionRange = range.cloneRange();
+      preSelectionRange.selectNodeContents(rootElement);
+      preSelectionRange.setEnd(range.startContainer, range.startOffset);
+      const start = preSelectionRange.toString().length;
+      const selectedTextLength = range.toString().length;
+      const end = start + selectedTextLength;
+      return { start, end };
+    };
+
     const handleMouseUp = () => {
       const sel = window.getSelection();
-      const text = sel.toString().trim();
-      
-      if (text && articleRef.current?.contains(sel.anchorNode)) {
-        const range = sel.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        const containerRect = articleRef.current.getBoundingClientRect();
-        
-        setSelection({
-          text,
-          rect: {
-            top: rect.top - containerRect.top,
-            left: rect.left - containerRect.left,
-            width: rect.width,
-            height: rect.height
-          },
-          start: range.startOffset,
-          end: range.endOffset
-        });
-      } else {
+      if (!sel || sel.rangeCount === 0) {
         setSelection(null);
+        return;
       }
+
+      const range = sel.getRangeAt(0);
+      const rootElement = articleRef.current?.querySelector('[data-manuscript-root="true"]');
+      if (!rootElement || !rootElement.contains(range.commonAncestorContainer)) {
+        setSelection(null);
+        return;
+      }
+
+      const rawText = range.toString();
+      const text = rawText.trim();
+      if (!text) {
+        setSelection(null);
+        return;
+      }
+
+      const { start, end } = calculateOffsets(range, rootElement);
+      if (start < 0 || end <= start || end > (piece?.content || "").length) {
+        setSelection(null);
+        return;
+      }
+
+      const rect = range.getBoundingClientRect();
+      const containerRect = articleRef.current.getBoundingClientRect();
+      setSelection({
+        text,
+        rect: {
+          top: rect.top - containerRect.top,
+          left: rect.left - containerRect.left,
+          width: rect.width,
+          height: rect.height,
+        },
+        start,
+        end,
+      });
     };
 
     document.addEventListener("mouseup", handleMouseUp);
     return () => document.removeEventListener("mouseup", handleMouseUp);
-  }, []);
+  }, [piece?.content]);
 
   /**
    * Save Handler: Posts new comments/highlights to Supabase.
    */
   const handleSaveComment = async (commentText) => {
-    if (!tempAnnotation || !user || !piece) return;
+    if (!tempAnnotation || !user || !piece || !canUseHighlightTools) return;
 
     try {
       // Link comment to current version when available.
@@ -233,9 +278,10 @@ export default function WorkshopPage() {
               comments={comments} 
               activeCommentId={activeCommentId} 
               onCommentClick={setActiveCommentId} 
+              draftAnnotation={tempAnnotation}
             />
             
-            {!isEditing && (
+            {canUseHighlightTools && (
               <SelectionToolbar 
                 selection={selection} 
                 onAnnotate={(temp) => {
@@ -258,6 +304,8 @@ export default function WorkshopPage() {
         isDesktopCollapsed={isDesktopCollapsed}
         setIsDesktopCollapsed={setIsDesktopCollapsed}
         currentUser={user}
+        canParticipate={canParticipate}
+        isCompleted={piece?.status === "completed"}
         onCommentUpdate={loadData} // Refetch data when children components update
       />
     </div>
